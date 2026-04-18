@@ -1,5 +1,6 @@
 import streamlit as st
 import akinator
+import cloudscraper
 
 # Configuración inicial de la página
 st.set_page_config(page_title="Akinator Web", page_icon="🧞‍♂️", layout="centered")
@@ -35,19 +36,28 @@ st.markdown("<p style='text-align: center; color: #94a3b8; font-size: 18px;'>Pie
 
 # Variables de estado (para mantener el juego activo al recargar)
 if 'aki' not in st.session_state:
-    st.session_state.aki = akinator.Akinator()
+    # Intento de evadir protección con sesión personalizada
+    scraper = cloudscraper.create_scraper(browser={"browser": "chrome", "platform": "windows", "desktop": True})
+    st.session_state.aki = akinator.Akinator(session=scraper)
 if 'started' not in st.session_state:
     st.session_state.started = False
 if 'guessed' not in st.session_state:
     st.session_state.guessed = False
 if 'game_over' not in st.session_state:
     st.session_state.game_over = False
+if 'error_msg' not in st.session_state:
+    st.session_state.error_msg = None
 
 def start_game():
-    st.session_state.aki.start_game(language="es")
-    st.session_state.started = True
-    st.session_state.guessed = False
-    st.session_state.game_over = False
+    try:
+        st.session_state.aki.start_game(language="es")
+        st.session_state.started = True
+        st.session_state.guessed = False
+        st.session_state.game_over = False
+        st.session_state.error_msg = None
+    except Exception as e:
+        # Aquí capturamos el fallo de la nube
+        st.session_state.error_msg = "El servidor de seguridad de Akinator rechazó la conexión (Cloudflare). Intenta recargar la página más tarde."
 
 def send_answer(ans):
     # Enviar respuesta
@@ -72,7 +82,12 @@ def reject_guess():
         st.session_state.guessed = False
 
 # Lógica condicional de la pantalla
-if not st.session_state.started:
+if st.session_state.error_msg:
+    st.error("Error de Conexión 🔌")
+    st.warning(st.session_state.error_msg)
+    st.button("🔄 Intentar de nuevo", on_click=start_game, use_container_width=True)
+
+elif not st.session_state.started:
     st.markdown("<br><br>", unsafe_allow_html=True)
     st.button("🔮 Iniciar Juego", on_click=start_game, use_container_width=True, type="primary")
 
